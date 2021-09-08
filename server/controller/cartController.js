@@ -1,17 +1,15 @@
 require('dotenv').config()
-const { Account, Item, Cart } = require('../models')
-const bcrypt = require('bcrypt')
-const jwt = require('jsonwebtoken')
+const { Cart, Item, Account } = require('../models')
 
-class AccountController {
-   static register (req, res, next) {
+class CartController {
+   static addCart (req, res, next) {
 
-      const {name, email, password} = req.body
+      const {AccountId, ItemId, quantity} = req.body
 
-      Account.create({name, email, password})
+      Cart.create({AccountId, ItemId, quantity})
       .then((data) => {
          res.status(201).json({
-            message: "Register Success!",
+            message: "add cart success!",
             result: data
          })
       })
@@ -23,54 +21,31 @@ class AccountController {
       })
    }
 
-   static login (req, res, next) {
-
-      const {email, password} = req.body
-
-      Account.findOne({where: {
-         email: email,
-         isAdmin: false
-      }})
+   static getAll (req, res, next) {
+      Cart.findAll({
+         include: [Account, Item]
+      })
       .then((data) => {
-         bcrypt.compare(password, data.password)
-         .then((isHashed) => {
-            if (!isHashed) {
-               res.status(200).json({
-                  message: "Wrong Email or Password"
-               })
-            } else {
-               jwt.sign({
-                  id: data.id,
-                  name: data.name,
-                  email: data.email,
-                  isAdmin: data.isAdmin
-               }, process.env.SECRET_KEY, 
-               (err, token) => {
-                  if (err) {
-                     console.log('error creating a token', err)
-                  } else {
-                     res.status(200).json({
-                        message: "Login success!",
-                        token
-                     })
-                  }
-               })
-            }
+         res.status(200).json({
+            message: "get Data success",
+            result: data
          })
       })
       .catch((err) => {
-         res.status(404).json({
-            message: "User not found",
+         res.status(500).json({
+            message: "Internal Server Error",
             log: err
          })
       })
-
    }
 
-   static getAll (req, res, next) {
-      Account.findAll({
-         attributes: ['id', 'name', 'email', 'isAdmin'],
-         include: [Item]
+   static getAllFromAccount (req, res, next) {
+      const id = req.params.AccountId
+      
+      Cart.findAll({
+         where: {AccountId: id},
+         include: [Item],
+         attributes: ['id', 'AccountId', "ItemId", "quantity"]
       })
       .then((data) => {
          res.status(200).json({
@@ -87,19 +62,18 @@ class AccountController {
    }
 
    static getOne (req, res, next) {
-      const accountId = req.params.id
+      const {AccountId, ItemId} = req.params
 
-      if (!accountId) {
+      if (!AccountId, ItemId) {
          res.status(422).json({
             message: "Data couldn't be processed"
          })
       } else {
-         Account.findOne({
+         Cart.findOne({
             where: {
-               id: accountId
+               AccountId, ItemId
             },
-            attributes: ['id', 'name', 'email', 'isAdmin'],
-            include: [Item]
+            include: [Account, Item]
          })
          .then((data) => {
             res.status(200).json({
@@ -117,18 +91,20 @@ class AccountController {
    }
 
    static update (req, res, next) {
+      const {AccountId, ItemId} = req.params
+      const {quantity} = req.body
 
-      const {name, email, password} = req.body
-      const accountId = req.params.id
-
-      if (!accountId) {
+      if (!AccountId || !ItemId) {
          res.status(422).json({
             message: "Data couldn't be processed"
          })
       } else {
-         Account.findOne({where:{id:accountId}})
+         Cart.findOne({
+            where:{AccountId:AccountId, ItemId:ItemId},
+            include: [Account, Item]
+         })
          .then((data) => {
-            data.update({name, email, password}, {where: {id: accountId}})
+            data.update({AccountId, ItemId, quantity}, {where: {AccountId:AccountId, ItemId:ItemId}})
             .then((updated) => {
                res.status(200).json({
                   message: "update Data success",
@@ -153,14 +129,40 @@ class AccountController {
    }
 
    static delete (req, res, next) {
-      const accountId = req.params.id
+      // const cartId = req.params.id
+      const {AccountId, ItemId} = req.params
 
-      if (!accountId) {
+      if (!AccountId || !ItemId) {
          res.status(422).json({
             message: "Data couldn't be processed"
          })
       } else {
-         Account.destroy({where: {id: accountId}})
+         Cart.destroy({where:{AccountId:AccountId, ItemId:ItemId}})
+         .then((data) => {
+            res.status(200).json({
+               message: "delete Data success",
+               result: data
+            }) 
+         })
+         .catch((err) => {
+            res.status(500).json({
+               message: "Internal Server Error",
+               log: err
+            })
+         })
+      }
+   }
+
+   static deleteAll (req, res, next) {
+      // const cartId = req.params.id
+      const {AccountId} = req.params
+
+      if (!AccountId) {
+         res.status(422).json({
+            message: "Data couldn't be processed"
+         })
+      } else {
+         Cart.destroy({where:{AccountId:AccountId}})
          .then((data) => {
             res.status(200).json({
                message: "delete Data success",
@@ -177,8 +179,8 @@ class AccountController {
    }
 
    static checkAllBody (req, res, next) {
-      const {name, email, password} = req.body
-      if (!name || !email || !password) {
+      const {AccountId, ItemId, quantity} = req.body
+      if (!AccountId || !ItemId || !quantity) {
          console.log("failed to validate all body")
          res.status(422).json({
             message: "Unprocessable Data"
@@ -190,4 +192,4 @@ class AccountController {
    }
 }
 
-module.exports = AccountController
+module.exports = CartController
